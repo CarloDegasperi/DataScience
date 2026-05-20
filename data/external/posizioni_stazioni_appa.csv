@@ -1,0 +1,9 @@
+"Nome stazione",Indirizzo,"Dati stazione",Località,Zona,Tipologia,"EU - codice europeo","IT - codice italiano",Posizione
+"PIANA ROTALIANA","Sette pergole",https://bollettino.appa.tn.it/aria/stazione/22,Mezzolombardo,Rurale,Fondo,IT1930A,402212,"46.19683, 11.11343"
+"RIVA GAR","via Trento",https://bollettino.appa.tn.it/aria/stazione/9,"Riva del Garda",Suburbana,Fondo,IT0753A,402204,"45.89146, 10.84448"
+"MONTE GAZA","Malga Gaza",https://bollettino.appa.tn.it/aria/stazione/15,Vallelaghi,Rurale,Fondo,IT1191A,402203,"46.08253,10.95804"
+"TRENTO PSC","Parco S. Chiara",https://bollettino.appa.tn.it/aria/stazione/2,Trento,Urbana,Fondo,IT1037A,402209,"46.06292, 11.12620"
+"ROVERETO LGP","via Manzoni",https://bollettino.appa.tn.it/aria/stazione/6,Rovereto,Urbana,Fondo,IT0591A,402206,"45.89243, 11.03941"
+"TRENTO VBZ","via Bolzano",https://bollettino.appa.tn.it/aria/stazione/4,Trento,Urbana,Traffico,IT1859A,402211,"46.10433, 11.11022"
+"AVIO A22","loc. Ischiaforana",https://bollettino.appa.tn.it/aria/stazione/23,Avio,Rurale,Fondo,,402213,"45.74215, 10.97043"
+"BORGO VAL","via 4 novembre",https://bollettino.appa.tn.it/aria/stazione/8,"Borgo Valsugana",Suburbana,Fondo,IT0703A,402201,"46.05184,11.45389"
