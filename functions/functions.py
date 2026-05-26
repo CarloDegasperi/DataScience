@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from shapely.geometry import Point
 
 def fill_hole(weather):
@@ -43,6 +44,45 @@ def winds_split(weather):
     weather_df = pd.concat([weather_df] + new_cols, axis=1)
     weather_df.drop(columns=winds_cols, inplace=True)
     return weather_df
+
+########################################################################################################################
+
+def restructure_weather(weather_df):
+    rows = []
+
+    for station_id in weather_df['station'].drop_duplicates():
+
+        df_station = weather_df[weather_df["station"] == station_id]
+
+        # === COLONNE DATI ===
+        temp_cols = [c for c in df_station.columns if c.startswith("temperatures.")]
+        prec_cols = [c for c in df_station.columns if c.startswith("precipitations.")]
+        winds_cols_spd = [c for c in df_station.columns if (c.startswith("spd_winds."))]
+        winds_cols_dir = [c for c in df_station.columns if (c.startswith("dir_winds."))]
+
+        for _, row in df_station.iterrows():
+            geometry = row['geometry']
+            data = row['date']
+
+            for i in range(len(temp_cols)):
+                hhmm = temp_cols[i].split(".")[1]
+                hour = hhmm[:2]
+                minute = hhmm[2:]
+
+                if(minute == "00"):
+                    rows.append({
+                        'Stazione': station_id,
+                        'Data': data,
+                        'Ora': int(hour),
+                        'Temperature': row[temp_cols[i]],
+                        'Precipitation': row[prec_cols[i]],
+                        'Winds_spd': row[winds_cols_spd[i]],
+                        'Winds_dir': row[winds_cols_dir[i]],
+                        'geometry': geometry
+                    }) 
+
+    out_df = gpd.GeoDataFrame(rows, geometry="geometry")
+    return out_df
 
 ########################################################################################################################
 
@@ -195,6 +235,29 @@ def add_eaqi(APPA_df):
 
 ########################################################################################################################
 
+def station_map(meteo_df, appa_comp_df):
+    meteo_df['t'] = pd.to_datetime(meteo_df['Data'].astype(str)) + pd.to_timedelta(meteo_df['Ora'], unit='h')
+    appa_comp_df['t'] = pd.to_datetime(appa_comp_df['Data'].astype(str)) + pd.to_timedelta(appa_comp_df['Ora'], unit='h')
+    meteo_df = gpd.GeoDataFrame(meteo_df, geometry="geometry")
+    appa_comp_df = gpd.GeoDataFrame(appa_comp_df, geometry="geometry")
+
+    m_df = meteo_df[['Stazione','geometry']].drop_duplicates()
+    a_df = appa_comp_df[['Stazione','geometry']].drop_duplicates()
+    map = gpd.sjoin_nearest(a_df,m_df,how='left',distance_col="dist")[['Stazione_left','Stazione_right']]
+    return map
+
+########################################################################################################################
+
+def combine_dfs(meteo_df, appa_comp_df, map):
+    df = appa_comp_df.merge(map, left_on='Stazione', right_on='Stazione_left')
+    final_df = df.merge(meteo_df,left_on=["Stazione_right", "t"],right_on=["Stazione", "t"],suffixes=(" appa", " meteo"))
+    final_df = final_df.rename(columns={"Data appa": "Data", "Ora appa": "Ora"})
+    final_df = final_df[['Data', 'Ora', 'Stazione appa', 'geometry appa', 'Stazione meteo', 'geometry meteo', 'SO2', 'NO2', 'CO', 'O3', 'PM10', 'PM2.5', 'EAQI', 'Temperature', 'Precipitation', 'Winds_spd', 'Winds_dir']]
+
+    return final_df
+
+########################################################################################################################
+
 def SET_time(SET_df):
     time = pd.to_datetime(SET_df['time']).dt
     
@@ -226,5 +289,6 @@ def get_month(time_str):
 
 def get_year(time_str):
     return 2000 + int(time_str[8:10])
+
 
 ########################################################################################################################
