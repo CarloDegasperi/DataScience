@@ -63,6 +63,7 @@ def restructure_weather(weather_df):
         for _, row in df_station.iterrows():
             geometry = row['geometry']
             data = row['date']
+            elevation = row['elevation']
 
             for i in range(len(temp_cols)):
                 hhmm = temp_cols[i].split(".")[1]
@@ -71,13 +72,14 @@ def restructure_weather(weather_df):
 
                 if(minute == "00"):
                     rows.append({
-                        'Stazione': station_id,
-                        'Data': data,
-                        'Ora': int(hour),
-                        'Temperature': row[temp_cols[i]],
-                        'Precipitation': row[prec_cols[i]],
-                        'Winds_spd': row[winds_cols_spd[i]],
-                        'Winds_dir': row[winds_cols_dir[i]],
+                        'station': station_id,
+                        'date': data,
+                        'hour': int(hour),
+                        'elevation': elevation,
+                        'temperature': row[temp_cols[i]],
+                        'precipitation': row[prec_cols[i]],
+                        'winds_spd': row[winds_cols_spd[i]],
+                        'winds_dir': row[winds_cols_dir[i]],
                         'geometry': geometry
                     }) 
 
@@ -148,11 +150,58 @@ def timed_weather(weather_df):
 
 ########################################################################################################################
 
-def get_geometry_APPA(APPA_df, APPA_pos):
-    target = {}
-    for i in range(len(APPA_pos['data names'])):
-        target[APPA_pos['data names'][i]] = Point(APPA_pos['lon'][i], APPA_pos['lat'][i])
-    return target
+def get_square_power(pow_pos_df, lines_df):
+    el_power_df = pd.merge(pow_pos_df,lines_df,left_on='LINESET',right_on='lineset',how='right')
+
+    # calcolo il totale di ubicazioni per ogni linea
+    tot_ub_df = el_power_df.groupby(['lineset', 'date', 'hour'])['NR_UBICAZIONI'].sum().reset_index().drop_duplicates(subset='lineset')
+    tot_ub_df = tot_ub_df.rename(columns={'NR_UBICAZIONI': 'tot_ub'})
+    el_power_df['tot_ub'] = el_power_df['lineset'].map(tot_ub_df.set_index('lineset')['tot_ub'])
+
+    el_power_df['power_square'] = el_power_df['power'] * el_power_df['NR_UBICAZIONI'] / el_power_df['tot_ub']
+    el_power_df = el_power_df.rename(columns={'SQUAREID': 'squareid'})
+
+    # quello che interessa a me è di trovare la potenza media oraria per quandrato. Quindi raggruppo per quadrato e sommo
+    sq_power_df = el_power_df.groupby(['squareid', 'date', 'hour'])['power_square'].sum().reset_index()
+
+    return sq_power_df
+
+########################################################################################################################
+
+def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, K):
+    dfs = []
+    for h in range(24): # voglio l'impatto degli inquinanti entro un giorno
+        radius = round(np.sqrt(6*K*h*3600) + 1) # distanza in m che assumiamo una particella possa percorrere in h ore
+        # sommo 1 per sopperire a h = 0
+        appa_buffer = appa_pos_mt
+        appa_buffer[f"geometry_buffer_{radius}"] = appa_buffer.geometry.buffer(radius)
+        appa_buffer = appa_buffer.set_geometry(f"geometry_buffer_{radius}")
+        area_df = gpd.sjoin(appa_buffer,grid_df_mt,predicate="intersects",how="inner")
+        area_df = pd.merge(left=area_df,right=sq_power_df,left_on='cellId',right_on='squareid',how='left')
+        area_df = area_df.groupby(['station', 'geometry_x', f'geometry_buffer_{radius}', 'date', 'hour']).sum('power_square').reset_index()
+        area_df = area_df.rename(columns={'geometry_x': 'geometry', 'power_square': f'power_area_{radius}'})
+
+        area_df = area_df.sort_values(['station', 'date', 'hour'])
+        # sto facendo una sorta di integrale sul tempo. Se una particella inquinante arriva ad una data distanza dopo tot ore, shifto la colonna 
+        # della potenza di quel numero di ore in modo che l'effetto, come è nella realtà, sia ritardato
+        area_df[f'{h}hb_power_area'] = area_df.groupby(['station'])[f'power_area_{radius}'].shift(h)
+        area_df = area_df[['station', 'date', 'hour', f'{h}hb_power_area']]
+
+        dfs.append(area_df)
+
+    final_power_df = dfs[0]
+
+    for df in dfs[1:]:
+        final_power_df = pd.merge(final_power_df,df,on=['station', 'date', 'hour'],how='outer')
+
+    final_power_df = final_power_df.dropna(axis=0)
+
+    # sommo sulle diverse aree e mi tengo solo la colonna con l'area totale
+    power_cols = [a for a in final_power_df.columns if a.endswith('hb_power_area')]
+    final_power_df['tot_area_power'] = final_power_df[power_cols].sum(axis=1)
+    final_power_df = final_power_df[['station', 'date', 'hour', 'tot_area_power']]
+
+    return final_power_df
 
 ########################################################################################################################
 
@@ -170,6 +219,8 @@ EAQI_THRESHOLDS = {
 
 EAQI_ORDER = {'good': 4, 'fair': 3, 'moderate': 2, 'poor': 1, 'awful': 0}
 
+########################################################################################################################
+
 def classify_pollutant(value, pollutant):
 
     if pd.isna(value):
@@ -183,6 +234,7 @@ def classify_pollutant(value, pollutant):
 
     return None
 
+########################################################################################################################
 
 def add_eaqi(APPA_df):
 
@@ -232,29 +284,6 @@ def add_eaqi(APPA_df):
     APPA_df['EAQI'] = air_quality
 
     return APPA_df
-
-########################################################################################################################
-
-def station_map(meteo_df, appa_comp_df):
-    meteo_df['t'] = pd.to_datetime(meteo_df['Data'].astype(str)) + pd.to_timedelta(meteo_df['Ora'], unit='h')
-    appa_comp_df['t'] = pd.to_datetime(appa_comp_df['Data'].astype(str)) + pd.to_timedelta(appa_comp_df['Ora'], unit='h')
-    meteo_df = gpd.GeoDataFrame(meteo_df, geometry="geometry")
-    appa_comp_df = gpd.GeoDataFrame(appa_comp_df, geometry="geometry")
-
-    m_df = meteo_df[['Stazione','geometry']].drop_duplicates()
-    a_df = appa_comp_df[['Stazione','geometry']].drop_duplicates()
-    map = gpd.sjoin_nearest(a_df,m_df,how='left',distance_col="dist")[['Stazione_left','Stazione_right']]
-    return map
-
-########################################################################################################################
-
-def combine_dfs(meteo_df, appa_comp_df, map):
-    df = appa_comp_df.merge(map, left_on='Stazione', right_on='Stazione_left')
-    final_df = df.merge(meteo_df,left_on=["Stazione_right", "t"],right_on=["Stazione", "t"],suffixes=(" appa", " meteo"))
-    final_df = final_df.rename(columns={"Data appa": "Data", "Ora appa": "Ora"})
-    final_df = final_df[['Data', 'Ora', 'Stazione appa', 'geometry appa', 'Stazione meteo', 'geometry meteo', 'SO2', 'NO2', 'CO', 'O3', 'PM10', 'PM2.5', 'EAQI', 'Temperature', 'Precipitation', 'Winds_spd', 'Winds_dir']]
-
-    return final_df
 
 ########################################################################################################################
 
