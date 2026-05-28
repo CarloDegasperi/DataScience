@@ -328,10 +328,12 @@ def datetime_to_int(datetime):
 
 ########################################################################################################################
 
+########################################################################################################################
+
 def shift_prec(df, hours=1):
     # con questo sort facciamo in modo che le prime precipitazioni di un giorno vengano shiftate sulle ultime del
     # giorno prima
     return (df.sort_values(['station_appa', 'date', 'hour'])
-          .groupby('station_appa')['precipitation']            # raggruppando in base alla stazione evitiamo scambi di dati
+          .groupby('station_appa')['precipitations']            # raggruppando in base alla stazione evitiamo scambi di dati
           .shift(hours)                                         # effettivo shist
           .sort_index())                                        # le rimettiamo nell'ordine iniziale
