@@ -1,6 +1,6 @@
 # Classificazione
 
-Dopo aver preparato e preprocessato il DataFrame nel notebook `EDA.ipynb`, l’obiettivo successivo è quello di predire l’indice di qualità dell’aria (EAQI) in una determinata ora e giorno, utilizzando come input i dati raccolti nelle ore e nei giorni precedenti.
+Dopo aver preparato e preprocessato il DataFrame nel notebook `EDA.ipynb`, l’obiettivo successivo è quello di usare algoritmi di classificazione per predire l’indice di qualità dell’aria (EAQI) dato uno storico sul passato.
 
 L’indice EAQI può assumere cinque diverse classi qualitative:
 
