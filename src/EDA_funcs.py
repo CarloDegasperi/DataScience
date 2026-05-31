@@ -48,6 +48,7 @@ def winds_split(weather):
 ########################################################################################################################
 
 def restructure_weather(weather_df):
+    
     rows = []
 
     for station_id in weather_df['station'].drop_duplicates():
@@ -65,88 +66,49 @@ def restructure_weather(weather_df):
             data = row['date']
             elevation = row['elevation']
 
+            # riportiamo innanzitutto tutti i dati rilevati ai quarti d'ora
             for i in range(len(temp_cols)):
                 hhmm = temp_cols[i].split(".")[1]
                 hour = hhmm[:2]
                 minute = hhmm[2:]
 
-                if(minute == "00"):
-                    rows.append({
-                        'station': station_id,
-                        'date': data,
-                        'hour': int(hour),
-                        'elevation': elevation,
-                        'temperature': row[temp_cols[i]],
-                        'precipitation': row[prec_cols[i]],
-                        'winds_spd': row[winds_cols_spd[i]],
-                        'winds_dir': row[winds_cols_dir[i]],
-                        'geometry': geometry
-                    }) 
+                rows.append({
+                    'station': station_id,
+                    'date': data,
+                    'hour': int(hour),
+                    'minute': int(minute),
+                    'elevation': elevation,
+                    'temperature': row[temp_cols[i]],
+                    'precipitation': row[prec_cols[i]],
+                    'winds_spd': row[winds_cols_spd[i]],
+                    'winds_dir': row[winds_cols_dir[i]],
+                    'geometry': geometry
+                }) 
 
-    out_df = gpd.GeoDataFrame(rows, geometry="geometry")
-    return out_df
+    organized_df = gpd.GeoDataFrame(rows, geometry="geometry")
+
+    # voglia i dati solo su base oraria, in modo da conformare con i dati APPA.
+    # per tenere conto delle informazioni rilevate ogni quarto d'ora, mediamo le informazioni su base oraria.
+    # in particolare riferiamo ad una data ora X la media dei dati da (X-1):15 a X:00
+    organized_df['datetime'] = pd.to_datetime(organized_df['date']) + pd.to_timedelta(organized_df['hour'], unit='h') + pd.to_timedelta(organized_df['minute'], unit='m')
+    organized_df['hour_ref'] = (organized_df['datetime'] + pd.Timedelta(minutes=45)).dt.floor('h')
+    organized_df = organized_df.groupby(['station', 'elevation', 'geometry', 'hour_ref'])[['temperature', 'precipitation', 'winds_spd', 'winds_dir']].mean().reset_index()
+    organized_df['date'] = organized_df['hour_ref'].dt.date
+    organized_df['hour'] = organized_df['hour_ref'].dt.hour
+
+    return organized_df[['station', 'date', 'hour', 'elevation', 'temperature', 'precipitation', 'winds_spd', 'winds_dir', 'geometry']]
 
 ########################################################################################################################
 
-def timed_weather(weather_df):
-    t_weather_df = None
+def get_AQI_pol(value, intervals):
+    if pd.isna(value):
+        return np.nan
 
-    for station_id in weather_df['station'].drop_duplicates():
-
-        df_station = weather_df[weather_df['station'] == station_id]
-
-        # === COLONNE PRECIPITAZIONI ===
-        temp_cols = [c for c in df_station.columns if c.startswith('temperatures.')]
-        prec_cols = [c for c in df_station.columns if c.startswith('precipitations.')]
-        winds_cols_spd = [c for c in df_station.columns if c.startswith('spd_winds.')]
-        winds_cols_dir = [c for c in df_station.columns if c.startswith('dir_winds.')]
-
-        # lista finale
-        rows = []
-        prec = []
-        winds_spd = []
-        winds_dir = []
-
-        # === COSTRUZIONE NUOVO DATAFRAME ===
-        for _, row in df_station.iterrows():
-
-            date = pd.to_datetime(row['date'])
-
-            for i in range(len(temp_cols)):
-
-                # estrae HHMM
-                hhmm = temp_cols[i].split('.')[1]
-
-                hour = hhmm[:2]
-                minute = hhmm[2:]
-
-                # costruzione datetime
-                dt = date.replace(
-                    hour=int(hour),
-                    minute=int(minute)
-                )
-
-                # formato richiesto:
-                # minuto-ora-giorno-mese-anno
-                # esempio 1215140313
-                custom_time = dt.strftime('%M%H%d%m%y')
-
-                rows.append({
-                    'datetime': custom_time,
-                    'temperatures_' + station_id: row[temp_cols[i]],
-                    'precipitations_' + station_id: row[prec_cols[i]],
-                    'winds_spd_' + station_id: row[winds_cols_spd[i]],
-                    'winds_dir_' + station_id: row[winds_cols_dir[i]]
-                }) 
-        
-        df = pd.DataFrame(rows)
-
-        if t_weather_df is None:
-            t_weather_df = df
-        else:
-            t_weather_df = t_weather_df.merge(df, on='datetime')
-    
-    return t_weather_df
+    for i, (low, high) in enumerate(intervals):
+        if low < value <= high:
+            return 20 / (high - low) * (value - low) + 20 * i
+               
+    return np.nan
 
 ########################################################################################################################
 
@@ -202,22 +164,6 @@ def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, K):
     final_power_df = final_power_df[['station', 'date', 'hour', 'tot_area_power']]
 
     return final_power_df
-
-########################################################################################################################
-
-EAQI_THRESHOLDS = {
-    'PM10': [(0, 20, 'good'), (21, 35, 'fair'), (36, 50, 'moderate'), (51, 100, 'poor'), (100, np.inf, 'awful')],
-
-    'NO2': [(0, 40, 'good'), (41, 100, 'fair'), (101, 200, 'moderate'), (201, 400, 'poor'), (400, np.inf, 'awful')],
-
-    'O3': [(0, 80, 'good'), (81, 120, 'fair'), (121, 180, 'moderate'), (181, 240, 'poor'), (240, np.inf, 'awful')],
-
-    'SO2': [(0, 100, 'good'), (101, 200, 'fair'), (201, 350, 'moderate'), (351, 500, 'poor'), (500, np.inf, 'awful')],
-
-    'CO': [(0, 5.0, 'good'), (5.1, 7.5, 'fair'), (7.6, 10, 'moderate'), (10.1, 20, 'poor'),(20, np.inf, 'awful')]
-}
-
-EAQI_ORDER = {'good': 4, 'fair': 3, 'moderate': 2, 'poor': 1, 'awful': 0}
 
 ########################################################################################################################
 
