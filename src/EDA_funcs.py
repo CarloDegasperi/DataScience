@@ -105,7 +105,7 @@ def get_AQI_pol(value, intervals):
         return np.nan
 
     for i, (low, high) in enumerate(intervals):
-        if low < value <= high:
+        if low <= value < high:
             return 20 / (high - low) * (value - low) + 20 * i
                
     return np.nan
@@ -130,14 +130,13 @@ def get_square_power(pow_pos_df, lines_df):
 
 ########################################################################################################################
 
-def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, K):
+def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, tot_h, radius):
     dfs = []
-    for h in range(24): # voglio l'impatto degli inquinanti entro un giorno
-        radius = round(np.sqrt(6*K*h*3600) + 1) # distanza in m che assumiamo una particella possa percorrere in h ore
-        # sommo 1 per sopperire a h = 0
-        appa_buffer = appa_pos_mt
-        appa_buffer[f"geometry_buffer_{radius}"] = appa_buffer.geometry.buffer(radius)
-        appa_buffer = appa_buffer.set_geometry(f"geometry_buffer_{radius}")
+    for h in range(tot_h):
+        for r in radius:
+            appa_buffer = appa_pos_mt
+            appa_buffer[f"geometry_buffer_{r}"] = appa_buffer.geometry.buffer(r)
+            appa_buffer = appa_buffer.set_geometry(f"geometry_buffer_{radius}")
         area_df = gpd.sjoin(appa_buffer,grid_df_mt,predicate="intersects",how="inner")
         area_df = pd.merge(left=area_df,right=sq_power_df,left_on='cellId',right_on='squareid',how='left')
         area_df = area_df.groupby(['station', 'geometry_x', f'geometry_buffer_{radius}', 'date', 'hour']).sum('power_square').reset_index()
@@ -156,6 +155,7 @@ def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, K):
     for df in dfs[1:]:
         final_power_df = pd.merge(final_power_df,df,on=['station', 'date', 'hour'],how='outer')
 
+    return final_power_df
     final_power_df = final_power_df.dropna(axis=0)
 
     # sommo sulle diverse aree e mi tengo solo la colonna con l'area totale
