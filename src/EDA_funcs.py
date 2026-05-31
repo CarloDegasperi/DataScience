@@ -130,43 +130,6 @@ def get_square_power(pow_pos_df, lines_df):
 
 ########################################################################################################################
 
-def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, tot_h, radius):
-    dfs = []
-    for h in range(tot_h):
-        for r in radius:
-            appa_buffer = appa_pos_mt
-            appa_buffer[f"geometry_buffer_{r}"] = appa_buffer.geometry.buffer(r)
-            appa_buffer = appa_buffer.set_geometry(f"geometry_buffer_{radius}")
-        area_df = gpd.sjoin(appa_buffer,grid_df_mt,predicate="intersects",how="inner")
-        area_df = pd.merge(left=area_df,right=sq_power_df,left_on='cellId',right_on='squareid',how='left')
-        area_df = area_df.groupby(['station', 'geometry_x', f'geometry_buffer_{radius}', 'date', 'hour']).sum('power_square').reset_index()
-        area_df = area_df.rename(columns={'geometry_x': 'geometry', 'power_square': f'power_area_{radius}'})
-
-        area_df = area_df.sort_values(['station', 'date', 'hour'])
-        # sto facendo una sorta di integrale sul tempo. Se una particella inquinante arriva ad una data distanza dopo tot ore, shifto la colonna 
-        # della potenza di quel numero di ore in modo che l'effetto, come è nella realtà, sia ritardato
-        area_df[f'{h}hb_power_area'] = area_df.groupby(['station'])[f'power_area_{radius}'].shift(h)
-        area_df = area_df[['station', 'date', 'hour', f'{h}hb_power_area']]
-
-        dfs.append(area_df)
-
-    final_power_df = dfs[0]
-
-    for df in dfs[1:]:
-        final_power_df = pd.merge(final_power_df,df,on=['station', 'date', 'hour'],how='outer')
-
-    return final_power_df
-    final_power_df = final_power_df.dropna(axis=0)
-
-    # sommo sulle diverse aree e mi tengo solo la colonna con l'area totale
-    power_cols = [a for a in final_power_df.columns if a.endswith('hb_power_area')]
-    final_power_df['tot_area_power'] = final_power_df[power_cols].sum(axis=1)
-    final_power_df = final_power_df[['station', 'date', 'hour', 'tot_area_power']]
-
-    return final_power_df
-
-########################################################################################################################
-
 def classify_pollutant(value, pollutant):
 
     if pd.isna(value):
