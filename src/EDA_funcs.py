@@ -105,6 +105,9 @@ def get_AQI_pol(value, intervals):
         return np.nan
 
     for i, (low, high) in enumerate(intervals):
+        if high == np.inf:
+            if value >= low:
+                return 20 * (i + 1)
         if low <= value < high:
             return 20 / (high - low) * (value - low) + 20 * i
                
