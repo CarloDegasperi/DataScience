@@ -133,3 +133,54 @@ def get_power_areas(appa_pos_mt, grid_df_mt, sq_power_df, K, tot_h):
     final_power_df = final_power_df[['station', 'date', 'hour', 'tot_area_power']]
 
     return final_power_df
+
+def add_eaqi(APPA_df):
+
+    APPA_df = APPA_df.copy()
+
+    air_quality = []
+
+    for _, row in APPA_df.iterrows():
+
+        categories = []
+
+        for col in APPA_df.columns:
+
+            if col == 'datetime':
+                continue
+
+            value = row[col]
+
+            # Detect pollutant from column name
+            pollutant = None
+
+            for p in EAQI_THRESHOLDS.keys():
+                if p in col:
+                    pollutant = p
+                    break
+
+            if pollutant is None:
+                continue
+
+            category = classify_pollutant(value, pollutant)
+
+            if category is not None:
+                categories.append(category)
+
+        # Worst category determines EAQI
+        if len(categories) == 0:
+            final_category = None
+
+        else:
+            final_category = min(
+                categories,
+                key=lambda x: EAQI_ORDER[x]
+            )
+
+        air_quality.append(final_category)
+
+    APPA_df['EAQI'] = air_quality
+
+    return APPA_df
+
+########################################################################################################################

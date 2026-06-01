@@ -148,57 +148,6 @@ def classify_pollutant(value, pollutant):
 
 ########################################################################################################################
 
-def add_eaqi(APPA_df):
-
-    APPA_df = APPA_df.copy()
-
-    air_quality = []
-
-    for _, row in APPA_df.iterrows():
-
-        categories = []
-
-        for col in APPA_df.columns:
-
-            if col == 'datetime':
-                continue
-
-            value = row[col]
-
-            # Detect pollutant from column name
-            pollutant = None
-
-            for p in EAQI_THRESHOLDS.keys():
-                if p in col:
-                    pollutant = p
-                    break
-
-            if pollutant is None:
-                continue
-
-            category = classify_pollutant(value, pollutant)
-
-            if category is not None:
-                categories.append(category)
-
-        # Worst category determines EAQI
-        if len(categories) == 0:
-            final_category = None
-
-        else:
-            final_category = min(
-                categories,
-                key=lambda x: EAQI_ORDER[x]
-            )
-
-        air_quality.append(final_category)
-
-    APPA_df['EAQI'] = air_quality
-
-    return APPA_df
-
-########################################################################################################################
-
 def SET_time(SET_df):
     time = pd.to_datetime(SET_df['time']).dt
     
@@ -240,10 +189,10 @@ def datetime_to_int(datetime):
 
 ########################################################################################################################
 
-def shift_prec(df, hours=1):
+def shift_prec(df, hours=1, col_name='precipitation'):
     # con questo sort facciamo in modo che le prime precipitazioni di un giorno vengano shiftate sulle ultime del
     # giorno prima
     return (df.sort_values(['station_appa', 'date', 'hour'])
-          .groupby('station_appa')['precipitation']            # raggruppando in base alla stazione evitiamo scambi di dati
+          .groupby('station_appa')[col_name]            # raggruppando in base alla stazione evitiamo scambi di dati
           .shift(hours)                                         # effettivo shist
           .sort_index())                                        # le rimettiamo nell'ordine iniziale
