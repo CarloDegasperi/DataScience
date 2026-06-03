@@ -1,6 +1,33 @@
 import pandas as pd
-import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn import metrics
+
+def display_abs_coefs(model, feature_cols, num_class = 2):
+    if (num_class == 2):
+        coefs_df = pd.DataFrame(model.coef_.T,columns=['coefficients'],index=feature_cols)
+
+        plt.figure(figsize=(12,9))
+
+        ordered_coefs_df = coefs_df.abs().sort_values('coefficients', ascending=False)
+        sns.barplot(x=ordered_coefs_df['coefficients'], y=ordered_coefs_df.index)
+        plt.title('Absolute value coefficients of the Logistic Regression model')
+        plt.xlabel('Absolute value of coefficients')
+        plt.ylabel('Features')
+        plt.grid()
+    else:
+        coefs_df = pd.DataFrame(model.coef_.T,columns=model.classes_,index=feature_cols)
+        
+        plt.figure(figsize=(12,9))
+
+        ordered_coefs_df = coefs_df.abs().sort_values('good', ascending=False)
+        ordered_coefs_df.abs().plot.barh()
+        
+        sns.set_context('talk')
+        plt.title('Absolute value coefficients of the Logistic Regression model')
+        plt.xlabel('Absolute value of coefficients')
+        plt.ylabel('Features')
+        plt.grid()
 
 def get_performance_param(model, X, y, thr = 0.5):
 
