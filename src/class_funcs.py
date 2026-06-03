@@ -1,7 +1,33 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import metrics
+
+################################################################################################################################################
+
+def get_train_valid_test(dataset_df, frac_train, frac_valid, feature_cols):
+    # troviamo i limiti
+    unique_days = np.sort(dataset_df['day'].unique())
+    split_day_1 = unique_days[int(len(unique_days) * frac_train)]
+    split_day_2 = unique_days[int(len(unique_days) * (frac_train + frac_valid))]
+
+    ## dividiamo il dataset nelle tre parti (non togliamo i bordi perché assumiamo portino ad un data leakage trascurabile)
+    train_df = dataset_df[dataset_df['day'] <= split_day_1]
+    valid_df = dataset_df[(split_day_1 < dataset_df['day']) & (dataset_df['day'] <= split_day_2)]
+    test_df  = dataset_df[dataset_df['day'] > split_day_2]
+
+    X_train = train_df[feature_cols]
+    X_valid = valid_df[feature_cols]
+    X_test = test_df[feature_cols]
+
+    y_train = train_df['target']
+    y_valid = valid_df['target']
+    y_test = test_df['target']
+
+    return X_train, X_valid, X_test, y_train, y_valid, y_test
+
+################################################################################################################################################
 
 def display_abs_coefs(model, feature_cols, num_class = 2):
     if (num_class == 2):
@@ -28,6 +54,36 @@ def display_abs_coefs(model, feature_cols, num_class = 2):
         plt.xlabel('Absolute value of coefficients')
         plt.ylabel('Features')
         plt.grid()
+    
+################################################################################################################################################
+
+def display_confusion_matrix(model, title1, X1, y1, title2 = None, X2 = None, y2 = None, thr = 0.5):
+    
+    if X2 is None and y2 is None:
+        plt.figure(figsize=(12, 5))
+
+        y_proba = model.predict_proba(X1)[:, 1]
+        y_pred = (y_proba >= thr).astype(int)
+        metrics.ConfusionMatrixDisplay.from_predictions(y1, y_pred, display_labels=model.classes_)
+        plt.title(title1)
+
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+        y_proba1 = model.predict_proba(X1)[:, 1]
+        y_pred1 = (y_proba1 >= thr).astype(int)
+        metrics.ConfusionMatrixDisplay.from_predictions(y1, y_pred1, display_labels=model.classes_, ax = axes[0])
+        axes[0].set_title(title1)
+
+        y_proba2 = model.predict_proba(X2)[:, 1]
+        y_pred2 = (y_proba2 >= thr).astype(int)
+        metrics.ConfusionMatrixDisplay.from_predictions(y2, y_pred2, display_labels=model.classes_, ax = axes[1])
+        axes[1].set_title(title2)
+
+        plt.tight_layout()
+        plt.show()
+
+################################################################################################################################################
 
 def get_performance_param(model, X, y, thr = 0.5):
 
@@ -48,4 +104,4 @@ def get_performance_param(model, X, y, thr = 0.5):
 
     return None
 
-
+################################################################################################################################################
