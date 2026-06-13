@@ -123,7 +123,7 @@ def plot_predictions(model, X1, y1, X2, y2):
 
 ################################################################################################################################################
 
-def plot_predictions_points(model, X1, y1, X2, y2):
+def plot_prediction_points(model, X1, y1, X2, y2):
 
     graph1_df = X1.copy()
     graph1_df['actual'] = y1
