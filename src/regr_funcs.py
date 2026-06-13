@@ -253,21 +253,6 @@ def display_importances(model, feature_cols):
 
 ################################################################################################################################################
 
-def evaluation(actual, prediction):
-    mse = metrics.mean_squared_error(actual, prediction)
-    rmse = np.sqrt(mse)
-    mae = metrics.mean_absolute_error(actual, prediction)
-    r2 = metrics.r2_score(actual, prediction)
-    
-    print('Mean Squared Error (MSE):         ', mse)
-    print('Root Mean Squared Error (RMSE):   ', rmse)
-    print('Mean Absolute Error (MAE):        ', mae)
-    print('Coefficient of Determination (R2):', r2)
-    
-    return mse, rmse, mae, r2
-
-################################################################################################################################################
-
 def add_time(full_dataframe):
     out = full_dataframe.copy()
     out['time'] = (full_dataframe['day'] + recover_hour(full_dataframe['sin_hour'], full_dataframe['cos_hour']) / 24)
