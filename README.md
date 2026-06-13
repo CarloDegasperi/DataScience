@@ -85,6 +85,6 @@ pip install -r requirements.txt
 
 ## Autori
 
-Carlo Degasperi - CarloDegasperi
-Andrea Storchi - ExtravagantReplicator
+- Carlo Degasperi - CarloDegasperi
+- Andrea Storchi - ExtravagantReplicator
 Progetto sviluppato nell'ambito di un percorso di Data Science.
