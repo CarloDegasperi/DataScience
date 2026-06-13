@@ -236,3 +236,40 @@ def plot_comparison_points(model, model_log1p, X1, y1, X2, y2):
 
     plt.tight_layout()
     plt.show()
+
+################################################################################################################################################
+
+def display_importances(model, feature_cols):
+    importance_df = pd.DataFrame({'importance': model.feature_importances_}, index=feature_cols)
+
+    importance_df = importance_df.sort_values(by='importance', ascending=True)
+
+    importance_df.plot.barh(figsize=(9,7))
+
+    plt.xlabel('Feature Importance')
+    plt.title('Random Forest Feature Importance')
+    plt.grid()
+    plt.show()
+
+################################################################################################################################################
+
+def evaluation(actual, prediction):
+    mse = metrics.mean_squared_error(actual, prediction)
+    rmse = np.sqrt(mse)
+    mae = metrics.mean_absolute_error(actual, prediction)
+    r2 = metrics.r2_score(actual, prediction)
+    
+    print('Mean Squared Error (MSE):         ', mse)
+    print('Root Mean Squared Error (RMSE):   ', rmse)
+    print('Mean Absolute Error (MAE):        ', mae)
+    print('Coefficient of Determination (R2):', r2)
+    
+    return mse, rmse, mae, r2
+
+################################################################################################################################################
+
+def add_time(full_dataframe):
+    out = full_dataframe.copy()
+    out['time'] = (full_dataframe['day'] + recover_hour(full_dataframe['sin_hour'], full_dataframe['cos_hour']) / 24)
+
+    return out
