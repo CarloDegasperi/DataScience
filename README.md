@@ -73,16 +73,6 @@ Grafici e immagini utilizzati per l'analisi e la documentazione.
 
 ---
 
-## Dipendenze
-
-Installazione:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
 ## Autori
 
 - Carlo Degasperi - `CarloDegasperi`
